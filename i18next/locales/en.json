@@ -1,0 +1,18 @@
+{
+    "homeScreenTitle": "Welcome!",
+    "homeScreenSubtitle": "How can I help you?",
+    "Enter your message": "Enter your message",
+    "send": "Send",
+    "key": "Test",
+    "botResponses": {
+        "hello": "Hello! How can I assist you today?"
+    },
+    
+  "contrast": "Contrast",
+  "contrastLevels": {
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High"
+  }
+
+}

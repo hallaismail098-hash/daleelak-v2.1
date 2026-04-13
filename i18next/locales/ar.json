@@ -1,0 +1,18 @@
+{
+    "homeScreenTitle": "اهلا بك!",
+    "homeScreenSubtitle": "كيف يمكنني المساعدة؟",
+    "Enter your message": "أدخل رسالتك",
+    "send": "ارسل",
+    "key": "تجرب",
+    "botResponses": {
+        "hello": "مرحبًا! كيف يمكنني مساعدتك اليوم؟"
+    },
+    
+  "contrast": "التباين",
+  "contrastLevels": {
+    "low": "منخفض",
+    "medium": "متوسط",
+    "high": "مرتفع"
+  }
+
+}
