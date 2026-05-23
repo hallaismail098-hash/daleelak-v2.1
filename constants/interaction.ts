@@ -13,6 +13,9 @@ export const PANEL_PADDING = SPACING.md;
 export const CONTROL_RADIUS = RADIUS.lg;
 export const PILL_RADIUS = RADIUS.pill;
 export const ICON_SIZE = DESIGN_ICON_SIZE.lg;
+export const TOP_BAR_CONTROL_GAP = SPACING.xs + 2;
+export const TOP_BAR_GROUP_GAP = SPACING.sm;
+export const TOP_BAR_SAFE_PADDING = SPACING.sm;
 export const HIT_SLOP = {
   top: SPACING.sm,
   bottom: SPACING.sm,

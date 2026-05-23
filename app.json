@@ -57,9 +57,11 @@
       "typedRoutes": true
     },
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "08a016ff-6da6-4159-9b8f-2d8314aac999"
+        "projectId": "b693affe-e939-4c59-b362-c9758e132c40"
       }
-    }
+    },
+    "owner": "hallaismail98"
   }
 }

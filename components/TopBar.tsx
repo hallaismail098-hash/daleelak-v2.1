@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Pressable, Text } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   BORDER_WIDTH,
@@ -11,10 +11,12 @@ import {
 import {
   COMPACT_TOUCH_TARGET,
   CONTROL_PADDING,
-  CONTROL_SPACING,
   HIT_SLOP,
   ICON_SIZE,
   PILL_RADIUS,
+  TOP_BAR_CONTROL_GAP,
+  TOP_BAR_GROUP_GAP,
+  TOP_BAR_SAFE_PADDING,
   TOUCH_TARGET,
 } from "@/constants/interaction";
 
@@ -45,175 +47,194 @@ export default function TopBar({
   onRefresh,
   onStartNewMessage,
 }: Props) {
-  const groupStyle = {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    flexShrink: 1,
-  };
   const touchTarget = easyTapMode ? TOUCH_TARGET + 6 : TOUCH_TARGET;
   const compactTouchTarget = easyTapMode
     ? COMPACT_TOUCH_TARGET + 4
     : COMPACT_TOUCH_TARGET;
   const controlPadding = easyTapMode ? CONTROL_PADDING + 2 : CONTROL_PADDING;
-  const controlSpacing = easyTapMode ? CONTROL_SPACING + 4 : CONTROL_SPACING;
   const hitSlop = easyTapMode
     ? { top: 10, bottom: 10, left: 10, right: 10 }
     : HIT_SLOP;
+  const languageLabel = isArabic ? "English" : "العربية";
+  const accessibilityLabel = isArabic ? "الوصول" : "Accessibility";
 
-  const labelStyle = {
-    marginStart: SPACING.xs + 2,
-    fontWeight: "600" as const,
-    fontSize: FONT_SIZE.sm,
-    color: colors.accent,
-  };
-
-  const IconButton = ({
-    icon,
-    onPress,
-    label,
-    expanded,
-  }: {
-    icon: keyof typeof Ionicons.glyphMap;
-    onPress: () => void;
-    label: string;
-    expanded?: boolean;
-  }) => (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
-        minWidth: touchTarget,
-        height: touchTarget,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: expanded ? colors.accent : colors.card,
-        borderWidth: BORDER_WIDTH.thin,
-        borderColor: expanded ? colors.accent : colors.line,
-        paddingHorizontal: controlPadding,
-        borderRadius: PILL_RADIUS,
-        marginRight: controlSpacing,
-        opacity: pressed ? 0.8 : 1,
-      })}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={expanded === undefined ? undefined : { expanded }}
-      hitSlop={hitSlop}
-    >
-      <Ionicons
-        name={icon}
-        size={ICON_SIZE}
-        color={expanded ? NEUTRAL.white : colors.accent}
-      />
-    </Pressable>
-  );
-
-  const CompactButton = ({
+  const ActionButton = ({
     icon,
     label,
     onPress,
+    active,
     expanded,
-    disabled,
+    compact,
+    showLabel,
+    labelDirection,
+    maxWidth,
+    isLast,
   }: {
     icon: keyof typeof Ionicons.glyphMap;
     label: string;
     onPress: () => void;
+    active?: boolean;
     expanded?: boolean;
-    disabled?: boolean;
-  }) => (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => ({
-        minHeight: compactTouchTarget,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: expanded ? colors.accent : colors.card,
-        borderWidth: BORDER_WIDTH.thin,
-        borderColor: expanded ? colors.accent : colors.line,
-        paddingHorizontal: controlPadding,
-        borderRadius: PILL_RADIUS,
-        marginLeft: controlSpacing,
-        opacity: disabled ? 0.5 : pressed ? 0.82 : 1,
-      })}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{
-        ...(expanded === undefined ? {} : { expanded }),
-        ...(disabled ? { disabled: true } : {}),
-      }}
-      hitSlop={hitSlop}
-    >
-      <Ionicons
-        name={icon}
-        size={ICON_SIZE}
-        color={expanded ? NEUTRAL.white : colors.accent}
-      />
-      <Text
-        style={[
-          labelStyle,
-          { color: expanded ? NEUTRAL.white : colors.accent },
+    compact?: boolean;
+    showLabel?: boolean;
+    labelDirection?: "ltr" | "rtl";
+    maxWidth?: number;
+    isLast?: boolean;
+  }) => {
+    const height = compact ? compactTouchTarget : touchTarget;
+    const foreground = active ? NEUTRAL.white : colors.accent;
+
+    return (
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.buttonBase,
+          {
+            height,
+            minWidth: height,
+            paddingHorizontal: compact ? controlPadding - 2 : controlPadding - 4,
+            backgroundColor: active ? colors.accent : colors.card,
+            borderColor: active ? colors.accent : colors.line,
+            marginEnd: isLast ? 0 : TOP_BAR_CONTROL_GAP,
+            opacity: pressed ? 0.82 : 1,
+          },
+          compact && styles.compactButton,
+          showLabel && styles.labelButton,
+          showLabel && maxWidth ? { maxWidth } : null,
         ]}
-        numberOfLines={1}
-        ellipsizeMode="tail"
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={
+          expanded === undefined ? undefined : { expanded }
+        }
+        hitSlop={hitSlop}
       >
-        {label}
-      </Text>
-    </Pressable>
-  );
+        <Ionicons name={icon} size={ICON_SIZE - 1} color={foreground} />
+        {showLabel ? (
+          <Text
+            style={[
+              styles.buttonLabel,
+              {
+                color: foreground,
+                writingDirection: labelDirection,
+              },
+            ]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {label}
+          </Text>
+        ) : null}
+      </Pressable>
+    );
+  };
 
   return (
     <View
-      style={{
-        paddingHorizontal: SCREEN_EDGE.horizontal,
-        paddingTop: SPACING.section,
-        paddingBottom: SPACING.sm,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        borderBottomWidth: BORDER_WIDTH.thin,
-        borderBottomColor: colors.line,
-      }}
+      style={[
+        styles.topBar,
+        {
+          paddingTop: TOP_BAR_SAFE_PADDING,
+          borderBottomColor: colors.line,
+          backgroundColor: colors.background,
+        },
+      ]}
       accessibilityRole="toolbar"
       accessibilityLabel={isArabic ? "شريط الأدوات" : "Toolbar"}
     >
-      <View style={[groupStyle, { marginRight: controlSpacing + 4 }]}>
-        <IconButton
+      <View style={styles.leftGroup}>
+        <ActionButton
           icon={tutorialActive ? "help-circle" : "help-circle-outline"}
           label={isArabic ? "مساعدة" : "Help"}
           onPress={onStartTutorial}
-          expanded={tutorialActive}
+          active={tutorialActive}
         />
-        <IconButton
+        <ActionButton
           icon="refresh-outline"
           label={isArabic ? "تحديث" : "Refresh"}
           onPress={onRefresh}
         />
-        <IconButton
+        <ActionButton
           icon="home-outline"
           label={isArabic ? "الرئيسية" : "Home"}
           onPress={onGoHome}
         />
-        <CompactButton
+        <ActionButton
           icon="add-circle-outline"
           label={isArabic ? "رسالة جديدة" : "New Message"}
           onPress={onStartNewMessage}
+          isLast
         />
       </View>
 
-      <View style={groupStyle}>
-        <CompactButton
+      <View style={styles.rightGroup}>
+        <ActionButton
           icon="globe-outline"
-          label={isArabic ? "English" : "العربية"}
+          label={languageLabel}
           onPress={toggleLanguage}
+          compact
+          showLabel
+          labelDirection={isArabic ? "ltr" : "rtl"}
+          maxWidth={120}
         />
-        <CompactButton
-          icon={drawerOpen ? "close-outline" : "options-outline"}
-          label={isArabic ? "الوصول" : "Access"}
+        <ActionButton
+          icon={drawerOpen ? "close-outline" : "accessibility-outline"}
+          label={accessibilityLabel}
           onPress={toggleDrawer}
+          active={drawerOpen}
           expanded={drawerOpen}
+          compact
+          isLast
         />
       </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  topBar: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: SCREEN_EDGE.horizontal,
+    paddingBottom: SPACING.sm + 2,
+    borderBottomWidth: BORDER_WIDTH.thin,
+  },
+  leftGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexShrink: 1,
+    minWidth: 0,
+    marginEnd: TOP_BAR_GROUP_GAP,
+  },
+  rightGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexShrink: 0,
+    minWidth: 0,
+    marginStart: TOP_BAR_GROUP_GAP,
+  },
+  buttonBase: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: BORDER_WIDTH.thin,
+    borderRadius: PILL_RADIUS,
+  },
+  compactButton: {
+    flexShrink: 0,
+  },
+  labelButton: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  buttonLabel: {
+    marginStart: SPACING.xs + 2,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: "600",
+    includeFontPadding: false,
+    textAlign: "auto",
+    flexShrink: 1,
+  },
+});

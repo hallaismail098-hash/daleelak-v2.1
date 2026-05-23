@@ -56,7 +56,9 @@ import {
 } from "expo-speech-recognition";
 
 
-  const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+const apiKey = process.env.EXPO_PUBLIC_API_KEY;
+console.log("ENV CHECK:", process.env.EXPO_PUBLIC_API_KEY);
+const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
 type ChatMessage = {
   isCurrentUser: boolean;
@@ -555,29 +557,23 @@ const assistantBubbleBg = grayscaleEnabled
     setMessage(transcript);
   });
   const createThread = async () => {
-    const threadRes = await fetch("https://api.openai.com/v1/threads", {
+    const threadData = await fetchOpenAIJson("createThread", `${OPENAI_BASE_URL}/threads`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-        "OpenAI-Beta": "assistants=v2",
-      },
+      headers: buildOpenAIHeaders(true),
     });
-
-    const threadData = await threadRes.json();
     setThread(threadData);
     return threadData;
   };
 
   const initChatBot = async () => {
-    const assistantRes = await fetch("https://api.openai.com/v1/assistants", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-        "OpenAI-Beta": "assistants=v2",
-      },
-      body: JSON.stringify({
+    try {
+      const assistantData = await fetchOpenAIJson(
+        "initAssistant",
+        `${OPENAI_BASE_URL}/assistants`,
+        {
+          method: "POST",
+          headers: buildOpenAIHeaders(true),
+          body: JSON.stringify({
         name: "Jordan Government Assistant",
         instructions: `
 AI Assistant Configuration for Government Transactions in Jordan
@@ -713,19 +709,30 @@ https://www.jordan.gov.jo
 10. Verify Accuracy  
 Ensure all details, processes, and guidance provided are accurate and up to date.
 `,
-        model: "gpt-4o",
-      }),
-    });
-
-    const assistantData = await assistantRes.json();
-    try {
+            model: "gpt-4o",
+          }),
+        },
+      );
       const threadData = await createThread();
 
       setAssistant(assistantData);
       setThread(threadData);
       setIsAppLoading(false);
     } catch (err) {
-      console.log("Assistant init error:", err);
+      console.error("Assistant init error:", err);
+      setIsAppLoading(false);
+      setMessages((prev) =>
+        prev.length > 0
+          ? prev
+          : [
+              {
+                isCurrentUser: false,
+                message: isArabic
+                  ? "تعذر تهيئة الاتصال بالخدمة. تحقق من مفتاح API ثم أعد المحاولة."
+                  : "Unable to initialize the service. Check the API key and try again.",
+              },
+            ],
+      );
     }
   };
   useEffect(() => {
@@ -1015,17 +1022,78 @@ Ensure all details, processes, and guidance provided are accurate and up to date
       return next;
     });
   };
-  const performResetAccessibility = () => {
-    setSpeechEnabled(true);
+  const createAssistantMessage = (content: string) =>
+    createNewMessage(content, false);
+
+  const appendAssistantMessage = (content: string) => {
+    console.log("[chat] final displayed message:", content);
+    setMessages((prev) => [...prev, createAssistantMessage(content)]);
+  };
+
+  const getRequestErrorMessage = () =>
+    isArabic
+      ? "خطأ: تعذر جلب الرد. تحقق من مفتاح API أو الاتصال ثم حاول مرة أخرى."
+      : "Error: Unable to fetch response. Check the API key or network connection and try again.";
+
+  const buildOpenAIHeaders = (includeJsonContentType = false) => ({
+    Authorization: `Bearer ${apiKey ?? ""}`,
+    ...(includeJsonContentType ? { "Content-Type": "application/json" } : {}),
+    "OpenAI-Beta": "assistants=v2",
+  });
+
+  const fetchOpenAIJson = async (
+    stage: string,
+    url: string,
+    options: RequestInit = {},
+  ) => {
+    console.log(`[openai:${stage}] request start`);
+    console.log(`[openai:${stage}] request URL:`, url);
+    console.log(`[openai:${stage}] api key exists:`, Boolean(apiKey));
+
+    const response = await fetch(url, options);
+    console.log(`[openai:${stage}] response status:`, response.status);
+
+    const rawBody = await response.text();
+    console.log(`[openai:${stage}] raw response body:`, rawBody);
+
+    let parsedResponse: any = null;
+    try {
+      parsedResponse = rawBody ? JSON.parse(rawBody) : null;
+    } catch (error) {
+      console.error(`[openai:${stage}] JSON parse error:`, error);
+      throw new Error(`Failed to parse ${stage} response JSON.`);
+    }
+
+    console.log(`[openai:${stage}] parsed response:`, parsedResponse);
+
+    if (!response.ok) {
+      const apiMessage =
+        parsedResponse?.error?.message ||
+        parsedResponse?.message ||
+        `Request failed with status ${response.status}`;
+      throw new Error(apiMessage);
+    }
+
+    return parsedResponse;
+  };
+
+  const performResetAccessibility = async () => {
+    if (isListening) {
+      try {
+        await ExpoSpeechRecognitionModule.stop();
+      } catch {}
+    }
+
+    await stopSpeech();
+
+    setSpeechEnabled(false);
     setReaderMode(false);
     setSimpleMode(false);
-
+    setDyslexiaMode(false);
     setDyslexiaFont(false);
     setDyslexiaSpacing(false);
-
     setFocusMode(false);
     setEasyTapMode(false);
-
     setFontScale(1);
     setContrastLevel(0);
     setGrayscaleEnabled(false);
@@ -1040,7 +1108,7 @@ Ensure all details, processes, and guidance provided are accurate and up to date
         : "This will restore the accessibility settings to their default state.",
       confirmLabel: isArabic ? "إعادة الضبط" : "Reset",
       onConfirm: async () => {
-        performResetAccessibility();
+        await performResetAccessibility();
       },
     });
   };
@@ -1127,6 +1195,7 @@ Ensure all details, processes, and guidance provided are accurate and up to date
     if (isLoading || !message.trim()) return;
 
     const input = message.trim();
+    console.log("[chat] send start:", input);
     setMessage("");
     setIsLoading(true);
 
@@ -1143,84 +1212,93 @@ Ensure all details, processes, and guidance provided are accurate and up to date
     return { isCurrentUser: isUser, message: content };
   };
   const handleSendMessage = async (input: string) => {
-    if (!assistant || !thread) return;
+    if (!apiKey) {
+      const errorText = isArabic
+        ? "خطأ: مفتاح API غير موجود. أضف EXPO_PUBLIC_API_KEY في ملف .env."
+        : "Error: API key is missing. Add EXPO_PUBLIC_API_KEY to the .env file.";
+      appendAssistantMessage(errorText);
+      announce(errorText);
+      return;
+    }
+
+    if (!assistant || !thread) {
+      const errorText = isArabic
+        ? "خطأ: المساعد غير جاهز بعد. أعد المحاولة بعد لحظة."
+        : "Error: The assistant is not ready yet. Please try again in a moment.";
+      appendAssistantMessage(errorText);
+      announce(errorText);
+      return;
+    }
 
     setMessages((prev) => [...prev, createNewMessage(input, true)]);
 
     try {
-      await fetch(`https://api.openai.com/v1/threads/${thread.id}/messages`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
-          "OpenAI-Beta": "assistants=v2",
-        },
+      await fetchOpenAIJson(
+        "createMessage",
+        `${OPENAI_BASE_URL}/threads/${thread.id}/messages`,
+        {
+          method: "POST",
+          headers: buildOpenAIHeaders(true),
         body: JSON.stringify({
           role: "user",
           content: input,
         }),
-      });
+        },
+      );
 
-      const runRes = await fetch(
-        `https://api.openai.com/v1/threads/${thread.id}/runs`,
+      const run = await fetchOpenAIJson(
+        "createRun",
+        `${OPENAI_BASE_URL}/threads/${thread.id}/runs`,
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${OPENAI_API_KEY}`,
-            "Content-Type": "application/json",
-            "OpenAI-Beta": "assistants=v2",
-          },
+          headers: buildOpenAIHeaders(true),
           body: JSON.stringify({
             assistant_id: assistant.id,
           }),
         },
       );
 
-      const run = await runRes.json();
-
       let status = "queued";
 
       while (status === "queued" || status === "in_progress") {
         await new Promise((r) => setTimeout(r, 2000));
 
-        const check = await fetch(
-          `https://api.openai.com/v1/threads/${thread.id}/runs/${run.id}`,
+        const data = await fetchOpenAIJson(
+          "checkRun",
+          `${OPENAI_BASE_URL}/threads/${thread.id}/runs/${run.id}`,
           {
-            headers: {
-              Authorization: `Bearer ${OPENAI_API_KEY}`,
-              "OpenAI-Beta": "assistants=v2",
-            },
+            headers: buildOpenAIHeaders(),
           },
         );
-
-        const data = await check.json();
         status = data.status;
       }
 
-      const messagesRes = await fetch(
-        `https://api.openai.com/v1/threads/${thread.id}/messages`,
+      const messageData = await fetchOpenAIJson(
+        "listMessages",
+        `${OPENAI_BASE_URL}/threads/${thread.id}/messages`,
         {
-          headers: {
-            Authorization: `Bearer ${OPENAI_API_KEY}`,
-            "OpenAI-Beta": "assistants=v2",
-          },
+          headers: buildOpenAIHeaders(),
         },
       );
 
-      const messageData = await messagesRes.json();
+      const reply =
+        messageData?.data?.find((item: any) => item.role === "assistant")
+          ?.content?.find((content: any) => content.type === "text")?.text
+          ?.value ?? null;
 
-      const reply = messageData.data[0].content[0].text.value;
-      setMessages((prev) => [...prev, createNewMessage(reply, false)]);
+      if (!reply) {
+        throw new Error("Assistant response field was missing.");
+      }
+
+      appendAssistantMessage(reply);
 
       announce(reply);
       speakText(reply);
-    } catch {
-      const errorText = isArabic
-        ? "خطأ: تعذر جلب الرد."
-        : "Error: Unable to fetch response.";
+    } catch (error) {
+      console.error("[chat] send failure:", error);
+      const errorText = getRequestErrorMessage();
 
-      setMessages((prev) => [...prev, createNewMessage(errorText, false)]);
-
+      appendAssistantMessage(errorText);
       announce(errorText);
       speakText(errorText);
     }
